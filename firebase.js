@@ -16,7 +16,8 @@ const firebaseConfig = {
     projectId: "houseruleschess",
     storageBucket: "houseruleschess.firebasestorage.app",
     messagingSenderId: "153875021963",
-    appId: "1:153875021963:web:621622c998f51420ed948e"
+    appId: "1:153875021963:web:621622c998f51420ed948e",
+    databaseURL: "https://houseruleschess-default-rtdb.firebaseio.com/",
 };
 
 // ==========================================================
