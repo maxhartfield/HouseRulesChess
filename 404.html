@@ -1,12 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="refresh" content="0; url=./">
-    <title>Redirect</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>House Rules Chess – Realtime Test</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        button {
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .counter {
+            margin-top: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .link {
+            margin-top: 1.5rem;
+            color: blue;
+        }
+    </style>
 </head>
 
-<body></body>
+<body>
+    <h1>Realtime Sync Test</h1>
+    <p id="gameId"></p>
+    <button id="clickBtn">Click Me</button>
+    <div class="counter">
+        <p>Player 1 clicks: <span id="p1Count">0</span></p>
+        <p>Player 2 clicks: <span id="p2Count">0</span></p>
+    </div>
+    <p class="link" id="shareLink"></p>
+
+    <!-- Load your app logic -->
+    <script type="module" src="./firebase.js"></script>
+</body>
 
 </html>
