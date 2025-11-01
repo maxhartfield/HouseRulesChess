@@ -62,9 +62,7 @@ if (!playerColor) {
 }
 
 // --- Initialize Chess.js ---
-const chess = new Chess();
-
-// --- Initialize Chessboard.js ---
+let chess = null;
 let board = null;
 let isUpdatingFromFirebase = false;
 
@@ -73,6 +71,14 @@ const gameRef = ref(db, "games/" + gameId);
 
 // --- Initialize or load game state ---
 async function initializeGame() {
+    // Initialize chess if library is loaded
+    if (typeof Chess !== 'undefined' && !chess) {
+        chess = new Chess();
+    } else if (!chess) {
+        // If Chess not loaded yet, wait a moment and try again
+        setTimeout(initializeGame, 100);
+        return;
+    }
     const snap = await get(gameRef);
     const data = snap.val();
 
@@ -130,6 +136,8 @@ async function initializeGame() {
 
 // --- Handle drag start ---
 function onDragStart(source, piece, position, orientation) {
+    if (!chess) return false; // Safety check
+
     // Prevent moving if not your turn or game is over
     const currentTurn = chess.turn();
     const isGameOver = chess.isGameOver();
@@ -149,7 +157,7 @@ function onDragStart(source, piece, position, orientation) {
 
 // --- Handle drop ---
 function onDrop(source, target) {
-    if (isUpdatingFromFirebase) {
+    if (!chess || isUpdatingFromFirebase) {
         return "snapback";
     }
 
@@ -179,6 +187,8 @@ function onSnapEnd() {
 
 // --- Update game state in Firebase ---
 async function updateGameState() {
+    if (!chess) return; // Safety check
+
     const gameStatus = chess.isGameOver()
         ? chess.isCheckmate()
             ? "checkmate"
@@ -230,7 +240,7 @@ let lastSyncedFen = null;
 
 onValue(gameRef, (snap) => {
     const data = snap.val();
-    if (!data || !data.fen) return;
+    if (!data || !data.fen || !chess) return; // Wait for chess to be initialized
 
     // Only update if FEN actually changed (avoid unnecessary updates from own moves)
     if (data.fen === lastSyncedFen) {
@@ -301,5 +311,20 @@ setInterval(() => {
     cleanupOldGames(24);
 }, 60 * 60 * 1000); // Every hour
 
-// --- Initialize game ---
-initializeGame();
+// --- Initialize game when DOM is ready ---
+function startGame() {
+    if (typeof Chess !== 'undefined') {
+        if (!chess) chess = new Chess();
+        initializeGame();
+    } else {
+        // Wait for scripts to load
+        setTimeout(startGame, 50);
+    }
+}
+
+// Start when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startGame);
+} else {
+    startGame();
+}
