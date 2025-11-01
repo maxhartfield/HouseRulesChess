@@ -63,6 +63,8 @@ if (!playerColor) {
 
 // --- Initialize Chess.js ---
 const chess = new Chess();
+
+// --- Initialize Chessboard.js ---
 let board = null;
 let isUpdatingFromFirebase = false;
 
@@ -299,9 +301,5 @@ setInterval(() => {
     cleanupOldGames(24);
 }, 60 * 60 * 1000); // Every hour
 
-// --- Initialize game when DOM is ready ---
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeGame);
-} else {
-    initializeGame();
-}
+// --- Initialize game ---
+initializeGame();
