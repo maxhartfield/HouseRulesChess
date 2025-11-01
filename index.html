@@ -4,41 +4,83 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>House Rules Chess Test</title>
+    <title>House Rules Chess</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
     <style>
         body {
             font-family: system-ui, sans-serif;
             text-align: center;
             padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
-        button {
-            padding: 1rem 2rem;
+        h1 {
+            margin-bottom: 1rem;
+        }
+
+        .game-info {
+            margin: 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .game-info p {
+            margin: 0.5rem 0;
+        }
+
+        #board {
+            margin: 2rem auto;
+            max-width: 600px;
+        }
+
+        .status {
+            margin: 1rem 0;
+            padding: 1rem;
             font-size: 1.2rem;
-            cursor: pointer;
+            font-weight: bold;
         }
 
-        .counter {
-            margin-top: 1rem;
-            font-size: 1.3rem;
+        .status.waiting {
+            color: orange;
+        }
+
+        .status.your-turn {
+            color: green;
+        }
+
+        .status.opponent-turn {
+            color: #666;
+        }
+
+        .status.game-over {
+            color: red;
         }
 
         .link {
-            margin-top: 2rem;
+            margin-top: 1rem;
             color: blue;
+        }
+
+        .link a {
+            color: blue;
+            text-decoration: underline;
         }
     </style>
 </head>
 
 <body>
-    <h1>Realtime Sync Test</h1>
-    <p id="gameId"></p>
-    <button id="clickBtn">Click Me</button>
-    <div class="counter">
-        <p>Player 1 clicks: <span id="p1Count">0</span></p>
-        <p>Player 2 clicks: <span id="p2Count">0</span></p>
+    <h1>House Rules Chess</h1>
+    <div class="game-info">
+        <p id="gameId">Loading...</p>
+        <div class="status" id="status">Connecting...</div>
+        <p class="link" id="shareLink"></p>
     </div>
-    <p class="link" id="shareLink"></p>
+
+    <div id="board"></div>
+
+    <!-- Chess libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0-beta.6/chess.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
 
     <!-- Firebase SDKs -->
     <script type="module" src="/HouseRulesChess/firebase.js"></script>
