@@ -79,11 +79,23 @@
     <div id="board"></div>
 
     <!-- jQuery (required by Chessboard.js) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" onload="loadChessboard()"
+        onerror="console.error('Failed to load jQuery')"></script>
 
     <!-- Chess libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script>
+        function loadChessboard() {
+            if (typeof jQuery === 'undefined' || !jQuery.fn) {
+                console.error('jQuery not properly loaded');
+                return;
+            }
+            // Load Chessboard.js only after jQuery is confirmed loaded
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js';
+            document.body.appendChild(script);
+        }
+    </script>
 
     <!-- Load your app logic -->
     <script type="module" src="/HouseRulesChess/firebase.js"></script>
