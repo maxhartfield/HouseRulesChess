@@ -132,7 +132,7 @@ async function initializeGame() {
 function onDragStart(source, piece, position, orientation) {
     // Prevent moving if not your turn or game is over
     const currentTurn = chess.turn();
-    const isGameOver = chess.isGameOver();
+    const isGameOver = chess.game_over();
 
     if (isGameOver || isUpdatingFromFirebase) {
         return false;
@@ -179,10 +179,10 @@ function onSnapEnd() {
 
 // --- Update game state in Firebase ---
 async function updateGameState() {
-    const gameStatus = chess.isGameOver()
-        ? chess.isCheckmate()
+    const gameStatus = chess.game_over()
+        ? chess.in_checkmate()
             ? "checkmate"
-            : chess.isDraw()
+            : chess.in_draw()
                 ? "draw"
                 : "gameover"
         : "active";
@@ -199,7 +199,7 @@ async function updateGameState() {
 function updateStatus() {
     if (!chess || !statusDiv) return;
 
-    const isGameOver = chess.isGameOver();
+    const isGameOver = chess.game_over();
     const currentTurn = chess.turn();
     const myTurn = (playerColor === "white" && currentTurn === "w") ||
         (playerColor === "black" && currentTurn === "b");
@@ -208,10 +208,10 @@ function updateStatus() {
 
     if (isGameOver) {
         statusDiv.className += " game-over";
-        if (chess.isCheckmate()) {
+        if (chess.in_checkmate()) {
             const winner = chess.turn() === "w" ? "Black" : "White";
             statusDiv.textContent = `Checkmate! ${winner} wins!`;
-        } else if (chess.isDraw()) {
+        } else if (chess.in_draw()) {
             statusDiv.textContent = "Game ended in a draw!";
         } else {
             statusDiv.textContent = "Game over!";
