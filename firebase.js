@@ -10,116 +10,153 @@ import {
     remove,
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-// --- your Firebase config ---
+// ---- Firebase config (note storageBucket .appspot.com) ----
 const firebaseConfig = {
     apiKey: "AIzaSyBSiVslttjTPAHsHpZftH5z-VkIE2v0yls",
     authDomain: "houseruleschess.firebaseapp.com",
     projectId: "houseruleschess",
-    storageBucket: "houseruleschess.firebasestorage.app",
+    storageBucket: "houseruleschess.appspot.com",
     messagingSenderId: "153875021963",
     appId: "1:153875021963:web:621622c998f51420ed948e",
     databaseURL: "https://houseruleschess-default-rtdb.firebaseio.com/",
 };
 
-// --- Init ---
+// ---- Init ----
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- Determine base path (repo-aware) ---
+// ---- Repo-aware base path (/HouseRulesChess/) ----
 const pathParts = window.location.pathname.split("/").filter(Boolean);
 const repoName = pathParts.length ? pathParts[0] : ""; // "HouseRulesChess"
 const basePath = repoName ? `/${repoName}/` : "/";
 
-// --- Extract or create game id ---
+// ---- Extract or create game id ----
+// --- Determine base path (repo-aware) + extract or create game id ---
+const onGitHubPages = location.hostname.endsWith('github.io');
+
+// Repo prefix is "/HouseRulesChess/" on GitHub Pages, "/" in local dev
+const repoSegment = onGitHubPages ? location.pathname.split('/').filter(Boolean)[0] : '';
+const repoPrefix = onGitHubPages ? `/${repoSegment}/` : '/';
+
+// Robustly extract gameId if present (don’t double-append "game/")
 let gameId = null;
-const gameIdx = window.location.pathname.indexOf(`${basePath}game/`);
-if (gameIdx !== -1) {
-    gameId = window.location.pathname.slice(
-        gameIdx + `${basePath}game/`.length
-    );
+if (location.pathname.includes('/game/')) {
+    // everything after the first "/game/" segment up to the next slash/hash/query
+    const after = location.pathname.split('/game/')[1] || '';
+    gameId = after.split(/[/?#]/)[0] || null;
 }
+
+// If no gameId in URL, create one and write a clean URL exactly once
 if (!gameId) {
     gameId = Math.random().toString(36).slice(2, 8);
-    const newUrl = new URL(`${basePath}game/${gameId}`, window.location.origin);
-    window.history.replaceState({}, "", newUrl.toString());
+    const newUrl = new URL(`${repoPrefix}game/${gameId}`, location.origin);
+    // Only replace when we’re not already at that exact path
+    if (location.pathname !== newUrl.pathname) {
+        history.replaceState({}, '', newUrl.toString());
+    }
 }
 
-// --- DOM elements ---
-const idLabel = document.getElementById("gameId");
-const statusDiv = document.getElementById("status");
-const link = document.getElementById("shareLink");
+// Share link always uses the canonical repo prefix
+const idLabel = document.getElementById('gameId');
+const statusDiv = document.getElementById('status');
+const link = document.getElementById('shareLink');
 
 idLabel.textContent = `Game ID: ${gameId}`;
-const shareURL = new URL(`${basePath}game/${gameId}`, window.location.origin).toString();
+const shareURL = new URL(`${repoPrefix}game/${gameId}`, location.origin).toString();
 link.innerHTML = `Share this link: <a href="${shareURL}">${shareURL}</a>`;
 
-// --- Assign player per browser tab ---
-let playerColor = sessionStorage.getItem(`player_${gameId}`);
-if (!playerColor) {
-    // First player to join becomes white, second becomes black
-    playerColor = "white"; // Will be determined by checking existing game state
-    sessionStorage.setItem(`player_${gameId}`, playerColor);
+// ---- Game state ----
+const chess = new Chess();
+let board = null;
+let playerRole = "spectator"; // "white" | "black" | "spectator"
+let isUpdatingFromFirebase = false;
+// --- Responsive sizing helpers ---
+const boardEl = document.getElementById("board");
+
+// Debounce helper (prevents overfiring on resize)
+function debounce(fn, ms = 120) {
+    let t;
+    return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn.apply(null, args), ms);
+    };
 }
 
-// --- Initialize Chess.js ---
-const chess = new Chess();
+// Calculate and apply responsive board width
+function fitBoard() {
+    if (!boardEl) return;
+    const vw = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
+    const size = Math.min(520, Math.max(280, Math.floor(vw * 0.92))); // 92% of viewport width
+    boardEl.style.width = size + "px";
+    if (board) board.resize();
+}
 
-// --- Initialize Chessboard.js ---
-let board = null;
-let isUpdatingFromFirebase = false;
+// Trigger refit on resize and orientation change
+window.addEventListener("resize", debounce(fitBoard, 120));
+window.addEventListener("orientationchange", fitBoard);
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) fitBoard();
+});
 
-// --- Database ref ---
+let lastSyncedFen = null;
+
+// ---- DB refs ----
 const gameRef = ref(db, "games/" + gameId);
 
-// --- Initialize or load game state ---
+// ---- Init or join game ----
 async function initializeGame() {
     const snap = await get(gameRef);
     const data = snap.val();
 
-    if (!data || !data.fen) {
-        // New game - initialize with starting position
-        const initialFen = chess.fen();
-        playerColor = "white"; // First player is white
-        sessionStorage.setItem(`player_${gameId}`, playerColor);
+    if (!data) {
+        // New game: claim white, set initial state, create players
+        playerRole = "white";
+        sessionStorage.setItem(`player_${gameId}`, playerRole);
 
         await set(gameRef, {
-            fen: initialFen,
+            fen: chess.fen(),         // starting position
             turn: "w",
+            players: { white: true }, // claim white
             created: Date.now(),
             lastActivity: Date.now(),
+            status: "active",
         });
     } else {
-        // Existing game - load state
-        chess.load(data.fen);
+        // Existing game: load position
+        if (data.fen) chess.load(data.fen);
 
-        // Determine player color based on who's already playing
-        const existingPlayers = data.players || {};
-        if (existingPlayers.white && existingPlayers.black) {
-            // Both players assigned, assign randomly to new viewer
-            playerColor = Math.random() < 0.5 ? "white" : "black";
-        } else if (existingPlayers.white) {
-            playerColor = "black";
+        // Determine/claim role
+        const stored = sessionStorage.getItem(`player_${gameId}`);
+        const players = data.players || {};
+
+        if (stored === "white" || stored === "black") {
+            playerRole = stored;
+        } else if (!players.white) {
+            playerRole = "white";
+            players.white = true;
+            await update(gameRef, { players, lastActivity: Date.now() });
+        } else if (!players.black) {
+            playerRole = "black";
+            players.black = true;
+            await update(gameRef, { players, lastActivity: Date.now() });
         } else {
-            playerColor = "white";
+            playerRole = "spectator";
         }
-        sessionStorage.setItem(`player_${gameId}`, playerColor);
-
-        // Update players list
-        const players = { ...existingPlayers, [playerColor]: true };
-        await update(gameRef, { players, lastActivity: Date.now() });
+        sessionStorage.setItem(`player_${gameId}`, playerRole);
     }
 
-    // Initialize board (wait for library to be ready)
-    if (typeof Chessboard !== 'undefined') {
+    // Init board UI
+
+    if (typeof Chessboard !== "undefined") {
         board = Chessboard("board", {
             position: chess.fen(),
-            draggable: true,
-            onDragStart: onDragStart,
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,
+            orientation: playerRole === "black" ? "black" : "white",
+            draggable: playerRole !== "spectator",
+            pieceTheme: "https://cdn.jsdelivr.net/gh/oakmac/chessboardjs/website/img/chesspieces/wikipedia/{piece}.png",
+            onDragStart,
+            onDrop,
+            onSnapEnd,
         });
-
-        // Set initial synced FEN
         lastSyncedFen = chess.fen();
     } else {
         console.error("Chessboard library not loaded");
@@ -128,63 +165,39 @@ async function initializeGame() {
     updateStatus();
 }
 
-// --- Handle drag start ---
-function onDragStart(source, piece, position, orientation) {
-    // Prevent moving if not your turn or game is over
-    const currentTurn = chess.turn();
-    const isGameOver = chess.game_over();
+// ---- Drag rules ----
+function onDragStart(source, piece) {
+    // Block spectators and game-over cases
+    if (playerRole === "spectator" || chess.game_over() || isUpdatingFromFirebase) return false;
 
-    if (isGameOver || isUpdatingFromFirebase) {
-        return false;
-    }
+    const myColor = playerRole === "white" ? "w" : "b";
+    const pieceColor = piece[0]; // "w" | "b"
+    const turn = chess.turn();
 
-    // Only allow moving your pieces
-    const pieceColor = piece.charAt(0) === "w" ? "w" : "b";
-    if (pieceColor !== currentTurn || pieceColor !== (playerColor === "white" ? "w" : "b")) {
-        return false;
-    }
+    // Only your pieces, only on your turn
+    if (pieceColor !== myColor || turn !== myColor) return false;
 
     return true;
 }
 
-// --- Handle drop ---
 function onDrop(source, target) {
-    if (isUpdatingFromFirebase) {
-        return "snapback";
-    }
+    if (isUpdatingFromFirebase) return "snapback";
 
-    // Make the move
-    const move = chess.move({
-        from: source,
-        to: target,
-        promotion: "q", // Always promote to queen for simplicity
-    });
+    const move = chess.move({ from: source, to: target, promotion: "q" });
+    if (move === null) return "snapback";
 
-    // Invalid move
-    if (move === null) {
-        return "snapback";
-    }
-
-    // Update Firebase with new game state
-    updateGameState();
-
-    // Don't snapback - let the move stay, Firebase will sync it back
-    // This prevents flickering and makes the UI more responsive
+    updateGameState(); // push to Firebase
+    // Let the UI stay; RTDB listener will confirm/realign
 }
 
-// --- Handle snap end ---
 function onSnapEnd() {
-    // Board will be updated from Firebase listener
+    // UI is driven by RTDB listener; nothing here
 }
 
-// --- Update game state in Firebase ---
+// ---- Push state to Firebase ----
 async function updateGameState() {
     const gameStatus = chess.game_over()
-        ? chess.in_checkmate()
-            ? "checkmate"
-            : chess.in_draw()
-                ? "draw"
-                : "gameover"
+        ? (chess.in_checkmate() ? "checkmate" : (chess.in_draw() ? "draw" : "gameover"))
         : "active";
 
     await update(gameRef, {
@@ -195,111 +208,87 @@ async function updateGameState() {
     });
 }
 
-// --- Update status display ---
+// ---- Status UI ----
 function updateStatus() {
-    if (!chess || !statusDiv) return;
+    if (!statusDiv) return;
 
-    const isGameOver = chess.game_over();
-    const currentTurn = chess.turn();
-    const myTurn = (playerColor === "white" && currentTurn === "w") ||
-        (playerColor === "black" && currentTurn === "b");
+    const over = chess.game_over();
+    const turn = chess.turn(); // "w" or "b"
+    const myTurn = (playerRole === "white" && turn === "w") || (playerRole === "black" && turn === "b");
 
     statusDiv.className = "status";
 
-    if (isGameOver) {
-        statusDiv.className += " game-over";
+    if (playerRole === "spectator") {
+        statusDiv.textContent = "You are observing";
+        return;
+    }
+
+    if (over) {
+        statusDiv.classList.add("game-over");
         if (chess.in_checkmate()) {
-            const winner = chess.turn() === "w" ? "Black" : "White";
-            statusDiv.textContent = `Checkmate! ${winner} wins!`;
+            const winner = turn === "w" ? "Black" : "White";
+            statusDiv.textContent = `Checkmate! ${winner} wins.`;
         } else if (chess.in_draw()) {
-            statusDiv.textContent = "Game ended in a draw!";
+            statusDiv.textContent = "Game ended in a draw.";
         } else {
-            statusDiv.textContent = "Game over!";
+            statusDiv.textContent = "Game over.";
         }
-    } else if (myTurn) {
-        statusDiv.className += " your-turn";
-        statusDiv.textContent = `Your turn (${playerColor})`;
+        return;
+    }
+
+    if (myTurn) {
+        statusDiv.classList.add("your-turn");
+        statusDiv.textContent = `Your turn (${playerRole}).`;
     } else {
-        statusDiv.className += " opponent-turn";
-        statusDiv.textContent = `Waiting for opponent... (${playerColor})`;
+        statusDiv.classList.add("opponent-turn");
+        statusDiv.textContent = `Waiting for opponent… (${playerRole}).`;
     }
 }
 
-// --- Sync updates from Firebase ---
-let lastSyncedFen = null;
-
+// ---- RTDB listener (sync board) ----
 onValue(gameRef, (snap) => {
     const data = snap.val();
     if (!data || !data.fen) return;
 
-    // Only update if FEN actually changed (avoid unnecessary updates from own moves)
-    if (data.fen === lastSyncedFen) {
-        return;
-    }
-
-    lastSyncedFen = data.fen;
+    if (data.fen === lastSyncedFen) return; // ignore no-op
     isUpdatingFromFirebase = true;
 
-    // Load the FEN position
     chess.load(data.fen);
+    if (board) board.position(chess.fen());
 
-    // Update board position
-    if (board) {
-        board.position(chess.fen());
-    }
-
-    // Update status
+    lastSyncedFen = data.fen;
     updateStatus();
-
     isUpdatingFromFirebase = false;
 });
 
-// --- Cleanup old games (runs automatically) ---
+// ---- Light cleanup of stale games (optional) ----
 async function cleanupOldGames(maxAgeHours = 24) {
     try {
         const gamesRef = ref(db, "games");
         const snapshot = await get(gamesRef);
-
-        if (!snapshot.exists()) {
-            return; // No games to clean up
-        }
+        if (!snapshot.exists()) return;
 
         const now = Date.now();
-        const maxAge = maxAgeHours * 60 * 60 * 1000; // Convert to milliseconds
+        const maxAge = maxAgeHours * 60 * 60 * 1000;
         const games = snapshot.val();
-        let deletedCount = 0;
+        let deleted = 0;
 
-        // Clean up old games (but skip the current game)
-        for (const gameIdToCheck in games) {
-            if (gameIdToCheck === gameId) continue; // Don't delete current game
-
-            const game = games[gameIdToCheck];
-            const lastActivity = game.lastActivity || game.created || 0;
-
-            if (now - lastActivity > maxAge) {
-                const gameRefToDelete = ref(db, `games/${gameIdToCheck}`);
-                await remove(gameRefToDelete);
-                deletedCount++;
+        for (const id in games) {
+            if (id === gameId) continue;
+            const g = games[id];
+            const last = g.lastActivity || g.created || 0;
+            if (now - last > maxAge) {
+                await remove(ref(db, `games/${id}`));
+                deleted++;
             }
         }
-
-        if (deletedCount > 0) {
-            console.log(`Automatically cleaned up ${deletedCount} old game(s).`);
-        }
-    } catch (error) {
-        console.error("Cleanup error:", error);
+        if (deleted) console.log(`Cleaned ${deleted} old game(s).`);
+    } catch (e) {
+        console.error("Cleanup error:", e);
     }
 }
+setTimeout(() => cleanupOldGames(24), 2000);
+setInterval(() => cleanupOldGames(24), 60 * 60 * 1000);
 
-// --- Run cleanup automatically on app start (with delay to not slow down initialization) ---
-setTimeout(() => {
-    cleanupOldGames(24);
-}, 2000); // Wait 2 seconds after page load
-
-// --- Also run cleanup periodically (every hour) ---
-setInterval(() => {
-    cleanupOldGames(24);
-}, 60 * 60 * 1000); // Every hour
-
-// --- Initialize game ---
+// ---- Go ----
 initializeGame();

@@ -1,0 +1,85 @@
+/* -------- General Layout -------- */
+html,
+body {
+    font-family: system-ui, sans-serif;
+    text-align: center;
+    padding: 1rem;
+    margin: 0;
+    max-width: 860px;
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #fafafa;
+    overscroll-behavior: contain;
+    /* stop scroll chaining */
+}
+
+/* -------- Game Info -------- */
+h1 {
+    margin: 0.5rem 0 1rem 0;
+}
+
+.game-info {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.game-info p {
+    margin: 0.25rem 0;
+}
+
+.link {
+    margin-top: 1rem;
+}
+
+.link a {
+    color: #0077cc;
+    text-decoration: underline;
+    word-break: break-all;
+}
+
+/* -------- Board -------- */
+#board {
+    width: min(92vw, 520px);
+    margin: 1rem auto;
+}
+
+.board-b72b1,
+.square-55d63 {
+    touch-action: none;
+    -ms-touch-action: none;
+}
+
+/* -------- Status Display -------- */
+.status {
+    margin: 0.75rem 0;
+    padding: 0.5rem;
+    font-weight: 600;
+}
+
+.status.your-turn {
+    color: #117a00;
+}
+
+.status.opponent-turn {
+    color: #555;
+}
+
+.status.waiting {
+    color: #b66a00;
+}
+
+.status.game-over {
+    color: #b00020;
+}
+
+/* -------- Responsive Adjustments -------- */
+@media (min-width: 900px) {
+    #board {
+        width: 520px;
+    }
+}
+
+/* -------- Safe-area padding for mobile -------- */
+.safe-bottom {
+    height: env(safe-area-inset-bottom);
+}

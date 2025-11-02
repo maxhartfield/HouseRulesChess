@@ -6,66 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>House Rules Chess</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            text-align: center;
-            padding: 2rem;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            margin-bottom: 1rem;
-        }
-
-        .game-info {
-            margin: 1rem 0;
-            font-size: 1.1rem;
-        }
-
-        .game-info p {
-            margin: 0.5rem 0;
-        }
-
-        #board {
-            margin: 2rem auto;
-            max-width: 600px;
-        }
-
-        .status {
-            margin: 1rem 0;
-            padding: 1rem;
-            font-size: 1.2rem;
-            font-weight: bold;
-        }
-
-        .status.waiting {
-            color: orange;
-        }
-
-        .status.your-turn {
-            color: green;
-        }
-
-        .status.opponent-turn {
-            color: #666;
-        }
-
-        .status.game-over {
-            color: red;
-        }
-
-        .link {
-            margin-top: 1rem;
-            color: blue;
-        }
-
-        .link a {
-            color: blue;
-            text-decoration: underline;
-        }
-    </style>
+    <script>
+        (function () {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            const onPages = location.hostname.endsWith('github.io');
+            // Local dev (served from project root):     /styles.css
+            // GitHub Pages (project under /HouseRulesChess/): /HouseRulesChess/styles.css
+            link.href = onPages ? '/HouseRulesChess/styles.css' : '/styles.css';
+            document.head.appendChild(link);
+        })();
+    </script>
 </head>
 
 <body>
@@ -84,7 +35,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
 
     <!-- Firebase SDKs -->
-    <script type="module" src="/HouseRulesChess/firebase.js"></script>
+    <script>
+        (function () {
+            const s = document.createElement('script');
+            s.type = 'module';
+            const onGitHubPages = location.hostname.endsWith('github.io');
+
+            // Always load from a known absolute path:
+            // - Local dev server (root):        /firebase.js
+            // - GitHub Pages project path:      /HouseRulesChess/firebase.js
+            s.src = onGitHubPages ? '/HouseRulesChess/firebase.js' : '/firebase.js';
+
+            document.head.appendChild(s);
+        })();
+    </script>
+
 </body>
 
 </html>
